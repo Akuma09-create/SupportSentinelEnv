@@ -5,7 +5,7 @@ import uuid
 from collections import OrderedDict
 from typing import Dict, List
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from .models import Action, Observation, StepResponse, EnvState
@@ -75,37 +75,36 @@ async def list_tasks() -> Dict[str, Dict]:
         for task_id, details in TASK_DEFINITIONS.items()
     }
 
-@app.post("/reset", response_model=Observation, tags=["Environment"])
+@app.api_route("/reset", methods=["POST", "GET"], tags=["Environment"])
 async def reset_environment(
-    task_id: str = Query("sla_triage", description="Task ID (default: sla_triage)"),
-    session_id: str = Query(None, description="Optional session ID"),
-    seed: int = Query(42, description="Random seed (default: 42)")
-) -> Observation:
+    request: Request,
+    task_id: str = Query("sla_triage"),
+    session_id: str = Query(None),
+    seed: int = Query(42)
+):
     """
     Resets an environment or creates a new one for a given task.
-    Uses query parameters only - no body required.
-    Returns the initial observation.
+    Accepts POST or GET with query parameters. No body required.
     """
     try:
         env = create_session(task_id, seed, session_id)
         observation = env.reset()
         
-        # Get the session_id that was assigned
-        assigned_session_id = None
-        for sid, e_instance in sessions.items():
-            if e_instance is env:
-                assigned_session_id = sid
+        # Find assigned session_id
+        assigned_id = None
+        for sid, e in sessions.items():
+            if e is env:
+                assigned_id = sid
                 break
         
-        headers = {"X-Session-Id": assigned_session_id} if assigned_session_id else {}
-        
+        headers = {"X-Session-Id": assigned_id} if assigned_id else {}
         return JSONResponse(content=observation.dict(), headers=headers)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except HTTPException as e:
-        raise e  # Reraise existing HTTP exceptions
+        raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/step", response_model=StepResponse, tags=["Environment"])
