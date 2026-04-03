@@ -1,0 +1,149 @@
+# OpenEnv Metadata for SupportSentinelEnv
+name: "SupportSentinelEnv"
+version: "1.0.0"
+description: "An AI agent manages a customer support queue, balancing sentiment and SLA deadlines."
+author: "GitHub Copilot"
+tags:
+  - openenv
+  - customer-support
+  - nlp
+  - rl
+  - sla
+  - sentiment
+
+# Environment Specifications
+reward_range: [0.0, 1.0]
+
+action_space:
+  description: "The set of actions the agent can perform on tickets."
+  actions:
+    - name: "prioritize"
+      description: "Submit a prioritized list of all ticket IDs. (Task 1 only)"
+      parameters:
+        - name: "ticket_ids"
+          type: "List[str]"
+          description: "A list of all ticket IDs in the desired order of resolution."
+    - name: "respond"
+      description: "Send a response to a customer with a specific tone."
+      parameters:
+        - name: "ticket_id"
+          type: "str"
+          description: "The ID of the ticket to respond to."
+        - name: "tone"
+          type: "str"
+          enum: ["empathetic", "formal", "apologetic", "solution_focused"]
+    - name: "escalate"
+      description: "Escalate a ticket to a different department."
+      parameters:
+        - name: "ticket_id"
+          type: "str"
+          description: "The ID of the ticket to escalate."
+        - name: "department"
+          type: "str"
+          enum: ["technical", "billing", "account", "shipping"]
+    - name: "compensate"
+      description: "Offer a form of compensation to the customer."
+      parameters:
+        - name: "ticket_id"
+          type: "str"
+          description: "The ID of the ticket to compensate."
+        - name: "type"
+          type: "str"
+          enum: ["credit", "refund", "priority_upgrade", "free_month"]
+    - name: "resolve"
+      description: "Mark a ticket as resolved."
+      parameters:
+        - name: "ticket_id"
+          type: "str"
+          description: "The ID of the ticket to resolve."
+        - name: "note"
+          type: "str"
+          description: "A closing note for the resolution."
+    - name: "defer"
+      description: "Choose to do nothing with a specific ticket for this step."
+      parameters:
+        - name: "ticket_id"
+          type: "str"
+          description: "The ID of the ticket to defer action on."
+
+observation_space:
+  description: "The observation of the environment state provided to the agent at each step."
+  type: "object"
+  properties:
+    - name: "tickets"
+      type: "List[Ticket]"
+      description: "The current state of all tickets in the queue."
+    - name: "task_id"
+      type: "str"
+      description: "The identifier of the current task."
+    - name: "task_description"
+      type: "str"
+      description: "A human-readable description of the task."
+    - name: "step_number"
+      type: "int"
+      description: "The current step number in the episode."
+    - name: "max_steps"
+      type: "int"
+      description: "The maximum number of steps for the episode."
+    - name: "available_actions"
+      type: "List[str]"
+      description: "The actions available for the current task."
+    - name: "current_score"
+      type: "float"
+      description: "The cumulative score within the episode."
+
+# Task Definitions
+tasks:
+  - id: "sla_triage"
+    description: "Prioritize 5 tickets to maximize SLA compliance."
+    difficulty: "Easy"
+    max_steps: 1
+    available_actions: ["prioritize"]
+  - id: "sentiment_recovery"
+    description: "Recover a single angry customer's sentiment before their SLA expires."
+    difficulty: "Medium"
+    max_steps: 8
+    available_actions: ["respond", "escalate", "compensate", "resolve", "defer"]
+  - id: "queue_optimization"
+    description: "Manage a queue of 6 tickets to optimize sentiment, SLA, and resolution rate."
+    difficulty: "Hard"
+    max_steps: 15
+    available_actions: ["respond", "escalate", "compensate", "resolve", "defer"]
+
+# API Endpoint Definitions
+api:
+  type: "fastapi"
+  port: 7860
+  endpoints:
+    - path: "/health"
+      method: "GET"
+      description: "Health check endpoint."
+    - path: "/tasks"
+      method: "GET"
+      description: "List all available tasks."
+    - path: "/reset"
+      method: "POST"
+      description: "Reset the environment to start a new episode."
+      body:
+        - name: "task_id"
+          type: "str"
+        - name: "session_id"
+          type: "Optional[str]"
+        - name: "seed"
+          type: "int"
+      returns: "Observation"
+    - path: "/step"
+      method: "POST"
+      description: "Take a step in the environment."
+      query_params:
+        - name: "session_id"
+          type: "str"
+      body: "Action"
+      returns: "StepResponse"
+    - path: "/state"
+      method: "GET"
+      description: "Get the full state of a session."
+      query_params:
+        - name: "session_id"
+          type: "str"
+      returns: "EnvState"
