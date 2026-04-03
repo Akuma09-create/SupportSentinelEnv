@@ -5,7 +5,7 @@ import uuid
 from collections import OrderedDict
 from typing import Dict, List
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from .models import Action, Observation, StepResponse, EnvState
@@ -75,16 +75,15 @@ async def list_tasks() -> Dict[str, Dict]:
         for task_id, details in TASK_DEFINITIONS.items()
     }
 
-@app.api_route("/reset", methods=["POST", "GET"], tags=["Environment"])
+@app.get("/reset", tags=["Environment"])
 async def reset_environment(
-    request: Request,
     task_id: str = Query("sla_triage"),
     session_id: str = Query(None),
     seed: int = Query(42)
 ):
     """
     Resets an environment or creates a new one for a given task.
-    Accepts POST or GET with query parameters. No body required.
+    GET endpoint - no request body required.
     """
     try:
         env = create_session(task_id, seed, session_id)
@@ -97,8 +96,11 @@ async def reset_environment(
                 assigned_id = sid
                 break
         
-        headers = {"X-Session-Id": assigned_id} if assigned_id else {}
-        return JSONResponse(content=observation.dict(), headers=headers)
+        response_dict = observation.dict()
+        if assigned_id:
+            response_dict["session_id"] = assigned_id
+        
+        return response_dict
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except HTTPException as e:
