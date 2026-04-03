@@ -5,11 +5,10 @@ import uuid
 from collections import OrderedDict
 from typing import Dict, List
 
-from fastapi import FastAPI, HTTPException, Query, Body
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
-from typing import Optional
 
-from .models import Action, ResetRequest, StepResponse, EnvState, Observation
+from .models import Action, Observation, StepResponse, EnvState
 from .environment import SupportSentinelEnv
 from .tasks import TASK_DEFINITIONS
 
@@ -78,23 +77,16 @@ async def list_tasks() -> Dict[str, Dict]:
 
 @app.post("/reset", response_model=Observation, tags=["Environment"])
 async def reset_environment(
-    request: Optional[ResetRequest] = Body(None),
     task_id: str = Query("sla_triage", description="Task ID (default: sla_triage)"),
     session_id: str = Query(None, description="Optional session ID"),
     seed: int = Query(42, description="Random seed (default: 42)")
 ) -> Observation:
     """
     Resets an environment or creates a new one for a given task.
-    Accepts both JSON body (ResetRequest) and query parameters for flexibility.
+    Uses query parameters only - no body required.
     Returns the initial observation.
     """
     try:
-        # Use body request if provided, otherwise use query parameters
-        if request is not None:
-            task_id = request.task_id
-            seed = request.seed
-            session_id = request.session_id
-        
         env = create_session(task_id, seed, session_id)
         observation = env.reset()
         
