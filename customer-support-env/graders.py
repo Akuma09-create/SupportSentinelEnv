@@ -125,44 +125,43 @@ def grade_sentiment_recovery(action: Dict[str, Any], initial_tickets: List[Ticke
     )
 
 
-def grade_queue_optimization(action: Dict[str, Any], initial_tickets: List[Ticket], final_tickets: List[Ticket], cumulative_score: float, done: bool) -> Reward:
+def grade_queue_optimization(action: Dict[str, Any], initial_tickets: List[Ticket], final_tickets: List[Ticket], cumulative_score: float, done: bool, max_steps: int) -> Reward:
     """
     Grades the 'queue_optimization' task.
-    Score is based on the value of tickets resolved.
-    A bonus is given for resolving tickets with higher value first.
+    A reward is given at each step a ticket is successfully resolved.
+    The reward is the ticket's value. The final score is the sum of rewards.
     """
-    # This grader is called at the end of the episode.
-    # The action that leads to the 'done' state is the final 'resolve'.
-    if not done:
-        # Intermediate steps have no reward, but we must return a valid Reward object.
+    # 1. Check if the action was to resolve a ticket
+    if action.get("action_type") != "resolve":
+        return Reward(score=0.0, partial_scores={}, feedback="No resolve action taken.", cumulative_score=cumulative_score)
+
+    ticket_id_to_resolve = action.get("parameters", {}).get("ticket_id")
+    if not ticket_id_to_resolve:
+        return Reward(score=0.0, partial_scores={}, feedback="Resolve action taken, but no ticket_id specified.", cumulative_score=cumulative_score)
+
+    # 2. Find the ticket in the state *before* the action to get its value
+    initial_ticket = next((t for t in initial_tickets if t.ticket_id == ticket_id_to_resolve), None)
+    if not initial_ticket:
+        return Reward(score=0.0, partial_scores={}, feedback=f"Agent tried to resolve ticket {ticket_id_to_resolve}, but it wasn't in the initial state for this step.", cumulative_score=cumulative_score)
+
+    # 3. Find the ticket in the state *after* the action to confirm it was resolved
+    final_ticket = next((t for t in final_tickets if t.ticket_id == ticket_id_to_resolve), None)
+    if not final_ticket or not final_ticket.resolved:
         return Reward(
             score=0.0,
             partial_scores={},
-            feedback="Ticket resolved. Awaiting end of episode for final score.",
+            feedback=f"Action to resolve ticket {ticket_id_to_resolve} was taken, but it was not resolved in the final state.",
             cumulative_score=cumulative_score
         )
 
-    # --- Final score calculation ---
-    resolved_tickets = [t for t in final_tickets if t.status == "resolved"]
+    # 4. If resolved, the reward for this step is the ticket's value.
+    step_reward = initial_ticket.value
     
-    if not resolved_tickets:
-        return Reward(
-            score=0.0,
-            partial_scores={"total_value": 0},
-            feedback="No tickets were resolved.",
-            cumulative_score=cumulative_score
-        )
-
-    total_value = sum(t.value for t in resolved_tickets)
-    
-    # Normalize the score against the total possible value from the initial set of tickets
-    score = total_value / max_possible_value if max_possible_value > 0 else 0
-
     return Reward(
-        score=score,
-        partial_scores={"total_value": total_value},
-        feedback=f"Episode finished. Total value of resolved tickets: {total_value}",
-        cumulative_score=cumulative_score + score
+        score=step_reward,
+        partial_scores={"resolved_value": initial_ticket.value},
+        feedback=f"Successfully resolved ticket {ticket_id_to_resolve} worth {initial_ticket.value:.1f}. Step reward: {step_reward:.1f}",
+        cumulative_score=cumulative_score + step_reward
     )
 
 

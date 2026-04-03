@@ -21,6 +21,8 @@ class Ticket(BaseModel):
     resolved: bool = False
     escalated: bool = False
     sla_breached: bool = False
+    value: float = 1.0
+    status: str = "pending"
 
     def model_post_init(self, __context: Any) -> None:
         """Ensure sentiment history starts with the initial score."""
