@@ -1,3 +1,12 @@
+---
+title: SupportSentinelEnv
+emoji: 🏢
+colorFrom: red
+colorTo: blue
+sdk: docker
+pinned: false
+license: mit
+---
 # 🚀 SupportSentinelEnv: An AI Customer Support Environment
 
 **`SupportSentinelEnv`** is a real-world simulation of a customer support ticket system, built for the **OpenEnv Hackathon** by Meta, Hugging Face, and Scaler. This environment allows AI agents to learn and operate using a standardized API, tackling challenges that mirror real-world customer service operations.
