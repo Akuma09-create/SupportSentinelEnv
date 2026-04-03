@@ -5,8 +5,9 @@ import uuid
 from collections import OrderedDict
 from typing import Dict, List
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.responses import JSONResponse
+from typing import Optional
 
 from .models import Action, ResetRequest, StepResponse, EnvState, Observation
 from .environment import SupportSentinelEnv
@@ -76,29 +77,41 @@ async def list_tasks() -> Dict[str, Dict]:
     }
 
 @app.post("/reset", response_model=Observation, tags=["Environment"])
-async def reset_environment(request: ResetRequest) -> Observation:
+async def reset_environment(
+    request: Optional[ResetRequest] = Body(None),
+    task_id: str = Query("sla_triage", description="Task ID (default: sla_triage)"),
+    session_id: str = Query(None, description="Optional session ID"),
+    seed: int = Query(42, description="Random seed (default: 42)")
+) -> Observation:
     """
     Resets an environment or creates a new one for a given task.
+    Accepts both JSON body (ResetRequest) and query parameters for flexibility.
     Returns the initial observation.
     """
     try:
-        env = create_session(request.task_id, request.seed, request.session_id)
-        observation = env.reset()
-        # The session_id is not part of the Pydantic model but useful for the client
-        # We add it to the response headers
-        headers = {"X-Session-Id": env.get_state("").session_id} # a bit of a hack to get session id
+        # Use body request if provided, otherwise use query parameters
+        if request is not None:
+            task_id = request.task_id
+            seed = request.seed
+            session_id = request.session_id
         
-        # A better way to get session_id
+        env = create_session(task_id, seed, session_id)
+        observation = env.reset()
+        
+        # Get the session_id that was assigned
+        assigned_session_id = None
         for sid, e_instance in sessions.items():
             if e_instance is env:
-                headers = {"X-Session-Id": sid}
+                assigned_session_id = sid
                 break
-
+        
+        headers = {"X-Session-Id": assigned_session_id} if assigned_session_id else {}
+        
         return JSONResponse(content=observation.dict(), headers=headers)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except HTTPException as e:
-        raise e # Reraise existing HTTP exceptions
+        raise e  # Reraise existing HTTP exceptions
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
