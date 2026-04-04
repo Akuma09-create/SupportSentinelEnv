@@ -5,10 +5,10 @@ import uuid
 from collections import OrderedDict
 from typing import Dict, List
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Query, Body
+from typing import Optional
 
-from .models import Action, Observation, StepResponse, EnvState
+from .models import Action, Observation, StepResponse, EnvState, ResetRequest
 from .environment import SupportSentinelEnv
 from .tasks import TASK_DEFINITIONS
 
@@ -75,38 +75,46 @@ async def list_tasks() -> Dict[str, Dict]:
         for task_id, details in TASK_DEFINITIONS.items()
     }
 
-@app.get("/reset", tags=["Environment"])
+@app.post("/reset", response_model=Observation, tags=["Environment"])
 async def reset_environment(
+    request_body: Optional[ResetRequest] = Body(None),
     task_id: str = Query("sla_triage"),
     session_id: str = Query(None),
     seed: int = Query(42)
 ):
     """
-    Resets an environment or creates a new one for a given task.
-    GET endpoint - no request body required.
+    Resets or creates an environment. Accepts POST with an optional body.
+    If body is present, it's used. Otherwise, query parameters are used.
+    This handles the validator sending a POST with an empty body.
     """
     try:
-        env = create_session(task_id, seed, session_id)
+        # Determine which values to use
+        final_task_id = task_id
+        final_session_id = session_id
+        final_seed = seed
+
+        if request_body:
+            final_task_id = request_body.task_id or task_id
+            final_session_id = request_body.session_id or session_id
+            final_seed = request_body.seed or seed
+
+        env = create_session(final_task_id, final_seed, final_session_id)
         observation = env.reset()
-        
-        # Find assigned session_id
+
+        # Find assigned session_id to return in headers
         assigned_id = None
         for sid, e in sessions.items():
             if e is env:
                 assigned_id = sid
                 break
         
-        response_dict = observation.dict()
-        if assigned_id:
-            response_dict["session_id"] = assigned_id
-        
-        return response_dict
+        headers = {"X-Session-Id": assigned_id} if assigned_id else {}
+        return JSONResponse(content=observation.dict(), headers=headers)
+
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except HTTPException as e:
-        raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 
 @app.post("/step", response_model=StepResponse, tags=["Environment"])

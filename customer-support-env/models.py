@@ -75,7 +75,9 @@ class StepResponse(BaseModel):
 
 
 class ResetRequest(BaseModel):
-    """Request body for the /reset endpoint."""
-    task_id: str
+    """
+    Model for the optional body of the /reset endpoint.
+    """
+    task_id: Optional[str] = "sla_triage"
     session_id: Optional[str] = None
-    seed: int = 42
+    seed: Optional[int] = 42
