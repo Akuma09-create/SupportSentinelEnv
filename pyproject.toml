@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-server = "customer-support-env.app:app"
+server = "server.app:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]
