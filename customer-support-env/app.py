@@ -2,6 +2,8 @@
 FastAPI server for the SupportSentinelEnv OpenEnv environment.
 """
 import uuid
+import sys
+import os
 from collections import OrderedDict
 from typing import Dict, List
 
@@ -9,9 +11,27 @@ from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.responses import JSONResponse
 from typing import Optional
 
-from .models import Action, Observation, StepResponse, EnvState, ResetRequest
-from .environment import SupportSentinelEnv
-from .tasks import TASK_DEFINITIONS
+# Handle imports for both package and standalone execution
+if __name__ != '__main__' and '.' not in __name__:
+    # When run standalone, add current dir to path
+    sys.path.insert(0, os.path.dirname(__file__))
+
+try:
+    from .models import Action, Observation, StepResponse, EnvState, ResetRequest
+    from .environment import SupportSentinelEnv
+    from .tasks import TASK_DEFINITIONS
+except (ImportError, ValueError):
+    # Fallback for standalone execution
+    import models
+    import environment
+    import tasks
+    Action = models.Action
+    Observation = models.Observation
+    StepResponse = models.StepResponse
+    EnvState = models.EnvState
+    ResetRequest = models.ResetRequest
+    SupportSentinelEnv = environment.SupportSentinelEnv
+    TASK_DEFINITIONS = tasks.TASK_DEFINITIONS
 
 # --- App Initialization ---
 app = FastAPI(

@@ -2,7 +2,10 @@
 Deterministic grading logic for SupportSentinelEnv tasks.
 """
 from typing import List, Dict, Any
-from .models import Ticket, Reward
+try:
+    from .models import Ticket, Reward
+except (ImportError, ValueError):
+    from models import Ticket, Reward
 
 def grade_sla_triage(action: Dict[str, Any], initial_tickets: List[Ticket], final_tickets: List[Ticket], cumulative_score: float) -> Reward:
     """

@@ -2,7 +2,10 @@
 Ticket data and task definitions for the SupportSentinelEnv.
 """
 from typing import Dict, List
-from .models import Ticket
+try:
+    from .models import Ticket
+except (ImportError, ValueError):
+    from models import Ticket
 
 # --- Task 1: SLA Triage ---
 SLA_TRIAGE_TICKETS: List[Dict] = [

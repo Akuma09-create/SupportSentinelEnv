@@ -5,9 +5,14 @@ import copy
 import random
 from typing import List, Dict, Any, Tuple
 
-from .models import Ticket, Action, Observation, Reward, EnvState
-from .tasks import TASK_DEFINITIONS
-from .graders import GRADER_FUNCTIONS
+try:
+    from .models import Ticket, Action, Observation, Reward, EnvState
+    from .tasks import TASK_DEFINITIONS
+    from .graders import GRADER_FUNCTIONS
+except ImportError:
+    from models import Ticket, Action, Observation, Reward, EnvState
+    from tasks import TASK_DEFINITIONS
+    from graders import GRADER_FUNCTIONS
 
 # Deterministic sentiment change values
 SENTIMENT_CHANGE_TABLE = {
