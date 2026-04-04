@@ -6,6 +6,7 @@ from collections import OrderedDict
 from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException, Query, Body
+from fastapi.responses import JSONResponse
 from typing import Optional
 
 from .models import Action, Observation, StepResponse, EnvState, ResetRequest
