@@ -1,0 +1,9 @@
+[project]
+name = "customer-support-env"
+version = "1.0.0"
+description = "SupportSentinel OpenEnv Environment"
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends.legacy:build"
