@@ -39,13 +39,18 @@ Return ONLY valid JSON with no explanation.
 Format: {"action_type": "prioritize", "parameters": {"ticket_ids": [...]}}""",
 
     "sentiment_recovery": """You are an expert customer relations specialist.
-Your task: improve customer satisfaction by responding to tickets with the right tone.
-Available tones: empathetic, apologetic, solution_focused, formal.
+Your task: improve customer satisfaction from initial negative state to +0.3 or higher.
+Strategy:
+- If sentiment < -0.6: ESCALATE (show expertise)
+- If sentiment -0.6 to -0.3: COMPENSATE (show empathy with solutions)
+- If sentiment -0.3 to 0.2: RESPOND with solution-focused tone
+- If sentiment near target: RESOLVE to finalize
 Return ONLY valid JSON with no explanation.
-Format: {"action_type": "respond", "parameters": {"ticket_id": "...", "tone": "..."}}""",
+Example: {"action_type": "compensate", "parameters": {"ticket_id": "t_angry", "type": "refund"}}""",
 
     "queue_optimization": """You are an expert support operations manager.
-Your task: resolve tickets efficiently to optimize the support queue.
+Your task: resolve tickets efficiently to optimize the support queue and maximize value.
+Prioritize high-value enterprise tickets first. Each resolved ticket adds its value to your score.
 Return ONLY valid JSON with no explanation.
 Format: {"action_type": "resolve", "parameters": {"ticket_id": "..."}}"""
 }
@@ -162,19 +167,47 @@ Available Actions: {actions}
 What action should we take next?"""
     
     def _get_fallback_action(self, observation: Dict[str, Any]) -> Dict[str, Any]:
-        """Fallback action if LLM call fails."""
+        """Fallback action if LLM call fails - uses intelligent strategy."""
         if self.task_id == "sla_triage":
             ticket_ids = [t["ticket_id"] for t in observation.get("tickets", [])]
             return {"action_type": "prioritize", "parameters": {"ticket_ids": ticket_ids}}
+        
         elif self.task_id == "sentiment_recovery":
             tickets = observation.get("tickets", [])
             unresolved = [t for t in tickets if not t.get("resolved")]
-            if unresolved:
-                return {"action_type": "respond", "parameters": {"ticket_id": unresolved[0]["ticket_id"], "tone": "empathetic"}}
+            
+            if not unresolved:
+                return {"action_type": "defer", "parameters": {}}
+            
+            ticket = unresolved[0]
+            sentiment = ticket.get("sentiment_score", 0)
+            step = observation.get("step_number", 0)
+            max_steps = observation.get("max_steps", 8)
+            steps_left = max_steps - step
+            
+            # Adaptive strategy based on sentiment and steps remaining
+            if sentiment < -0.6:  # Very angry
+                # Escalate first for very upset customers
+                return {"action_type": "escalate", "parameters": {"ticket_id": ticket["ticket_id"]}}
+            elif sentiment < -0.3:  # Angry
+                # Compensate to show willingness to resolve
+                return {"action_type": "compensate", "parameters": {"ticket_id": ticket["ticket_id"], "type": "refund"}}
+            elif sentiment < 0.2:  # Unhappy but recoverable
+                # Respond with right tone to build rapport
+                return {"action_type": "respond", "parameters": {"ticket_id": ticket["ticket_id"], "tone": "solution_focused"}}
+            elif steps_left <= 2 and sentiment < 0.3:  # Near end and not at target
+                # Final push with compensation
+                return {"action_type": "compensate", "parameters": {"ticket_id": ticket["ticket_id"], "type": "priority_support"}}
+            else:  # Good sentiment or time to resolve
+                # Resolve when sentiment is good enough
+                return {"action_type": "resolve", "parameters": {"ticket_id": ticket["ticket_id"]}}
+        
         elif self.task_id == "queue_optimization":
             tickets = observation.get("tickets", [])
             unresolved = [t for t in tickets if not t.get("resolved")]
             if unresolved:
+                # Prioritize high-value tickets
+                unresolved.sort(key=lambda t: t.get("value", 0), reverse=True)
                 return {"action_type": "resolve", "parameters": {"ticket_id": unresolved[0]["ticket_id"]}}
         
         return {"action_type": "defer", "parameters": {"ticket_id": observation.get("tickets", [{}])[0].get("ticket_id", "")}}
