@@ -18,12 +18,12 @@ def log_start(task_id: str, env_name: str, model: str) -> None:
 def log_step(step_num: int, action: str, reward: float, done: bool, error: Optional[str] = None) -> None:
     """Log individual step in required format."""
     error_str = f"error={error}" if error else "error=null"
-    print(f"STEP step={step_num} action={action} reward={reward:.3f} done={str(done).lower()} {error_str}", flush=True)
+    print(f"STEP step={step_num} action={action} reward={reward:.2f} done={str(done).lower()} {error_str}", flush=True)
 
 def log_end(success: bool, total_steps: int, final_score: float, rewards_list: List[float]) -> None:
     """Log episode end in required format."""
-    rewards_str = ",".join(f"{r:.3f}" for r in rewards_list)
-    print(f"END success={str(success).lower()} steps={total_steps} score={final_score:.3f} rewards=[{rewards_str}]", flush=True)
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards_list)
+    print(f"END success={str(success).lower()} steps={total_steps} score={final_score:.2f} rewards=[{rewards_str}]", flush=True)
 
 def get_action(task_id: str, observation: dict, step: int = 0) -> dict:
     """
