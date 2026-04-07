@@ -2,11 +2,13 @@
 Baseline inference script for SupportSentinelEnv.
 """
 import json
+import os
 import uuid
 import httpx
 from typing import List, Optional
 
-API_BASE_URL = "http://localhost:7860"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:7860")
+MODEL_NAME = os.getenv("MODEL_NAME", "baseline_agent")
 http_client = httpx.Client(base_url=API_BASE_URL)
 
 def log_start(task_id: str, env_name: str, model: str) -> None:
@@ -87,7 +89,7 @@ def get_action(task_id: str, observation: dict, step: int = 0) -> dict:
 def run_episode(task_id: str, seed: int):
     """Run a single episode."""
     session_id = f"ep_{task_id}_{seed}_{uuid.uuid4().hex[:8]}"
-    log_start(task_id, "SupportSentinelEnv", "baseline_agent")
+    log_start(task_id, "SupportSentinelEnv", MODEL_NAME)
     
     rewards = []
     step_count = 0
