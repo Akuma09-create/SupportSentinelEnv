@@ -5,6 +5,8 @@ import json
 import os
 import uuid
 import httpx
+import time
+from functools import wraps
 from typing import List, Optional
 
 # Validate HF_TOKEN
@@ -20,7 +22,7 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
-http_client = httpx.Client(base_url=ENV_BASE_URL)
+http_client = httpx.Client(base_url=ENV_BASE_URL, timeout=30.0)
 
 def log_start(task_id: str, env_name: str, model: str) -> None:
     """Log episode start in required format with square brackets."""
@@ -35,6 +37,23 @@ def log_end(success: bool, total_steps: int, rewards_list: List[float]) -> None:
     """Log episode end in required format with square brackets."""
     rewards_str = ",".join(f"{r:.2f}" for r in rewards_list)
     print(f"[END] success={str(success).lower()} steps={total_steps} rewards={rewards_str}", flush=True)
+
+def retry_on_failure(max_attempts: int = 3, delay: float = 1.0):
+    """Retry decorator with exponential backoff for transient failures."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_attempts - 1:
+                        raise
+                    backoff = delay * (2 ** attempt)
+                    time.sleep(backoff)
+            return None
+        return wrapper
+    return decorator
 
 def get_action(task_id: str, observation: dict, step: int = 0) -> dict:
     """
@@ -107,21 +126,28 @@ def run_episode(task_id: str, seed: int):
     success = False
     
     try:
-        # Reset
-        response = http_client.post("/reset", json={"task_id": task_id, "session_id": session_id, "seed": seed})
-        response.raise_for_status()
-        observation = response.json()
+        # Reset with retry
+        @retry_on_failure(max_attempts=3, delay=1.0)
+        def reset_with_retry():
+            response = http_client.post("/reset", json={"task_id": task_id, "session_id": session_id, "seed": seed})
+            response.raise_for_status()
+            return response.json()
+        
+        observation = reset_with_retry()
 
         done = False
         while not done and step_count < 20:
             action = get_action(task_id, observation, step_count)
             action_json = json.dumps(action)
             
-            # Step
-            response = http_client.post(f"/step?session_id={session_id}", json=action)
-            response.raise_for_status()
+            # Step with retry
+            @retry_on_failure(max_attempts=3, delay=1.0)
+            def step_with_retry():
+                response = http_client.post(f"/step?session_id={session_id}", json=action)
+                response.raise_for_status()
+                return response.json()
             
-            result = response.json()
+            result = step_with_retry()
             observation = result.get("observation", {})
             done = result.get("done", False)
             

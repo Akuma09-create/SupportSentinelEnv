@@ -67,7 +67,7 @@ pip install -r requirements.txt
 The environment is served via a FastAPI application. To start the server, run the following command in your terminal:
 
 ```bash
-uvicorn customer-support-env.app:app --host 0.0.0.0 --port 7860
+uvicorn app:app --host 0.0.0.0 --port 7860
 ```
 
 The server will now be running and ready to accept requests at `http://localhost:7860`.
