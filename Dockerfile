@@ -32,7 +32,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:7860/health || exit 1
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
 # Use the --host flag to expose the app on all network interfaces
 # Add the user's local bin to the PATH
 CMD ["/home/user/.local/bin/uvicorn", "app:app", "--app-dir", "customer-support-env", "--host", "0.0.0.0", "--port", "7860"]
