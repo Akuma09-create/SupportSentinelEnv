@@ -1,7 +1,7 @@
 # OpenEnv Metadata for SupportSentinelEnv
 name: "SupportSentinelEnv"
-version: "1.0.0"
-description: "An AI agent manages a customer support queue, balancing sentiment and SLA deadlines."
+version: "1.1.0"
+description: "An AI agent manages a customer support queue, balancing sentiment and SLA deadlines. Features advanced dynamic sentiment decay and 15-ticket concurrent queue optimization."
 author: "GitHub Copilot"
 tags:
   - openenv
@@ -10,6 +10,8 @@ tags:
   - rl
   - sla
   - sentiment
+  - dynamic-adversarial
+  - multi-task
 
 # Environment Specifications
 reward_range: [0.0, 1.0]

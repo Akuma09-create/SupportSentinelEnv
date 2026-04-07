@@ -110,16 +110,28 @@ class SupportSentinelEnv:
         ticket.sentiment_history.append(ticket.sentiment_score)
         feedback_log.append(f"Ticket {ticket.ticket_id} sentiment changed from {initial_score:.2f} to {ticket.sentiment_score:.2f} (change: {change:.2f}).")
 
-    def _update_slas(self):
-        """Updates the SLA counters for all unresolved tickets."""
+    def _update_slas(self, feedback_log: list = None):
+        """Updates the SLA counters for all unresolved tickets and applies sentiment decay.
+        
+        Sentiment decay represents growing customer frustration when their tickets are ignored.
+        Each unresolved ticket loses 0.05 sentiment per step they remain unresolved.
+        """
+        if feedback_log is None:
+            feedback_log = []
+        
         for ticket in self.tickets:
             if not ticket.resolved:
+                # SLA countdown
                 if ticket.sla_steps_remaining > 0:
                     ticket.sla_steps_remaining -= 1
                 if ticket.sla_steps_remaining == 0 and not ticket.sla_breached:
                     ticket.sla_breached = True
                     # Apply a one-time sentiment penalty for breaching SLA
-                    self._apply_sentiment_change(ticket, -0.25, [])
+                    self._apply_sentiment_change(ticket, -0.25, feedback_log)
+                
+                # ADVANCED DYNAMIC: Sentiment decay (customers get angrier if ignored)
+                # This applies EVERY step an unresolved ticket is NOT being handled
+                self._apply_sentiment_change(ticket, -0.05, feedback_log)
 
     def step(self, action: Action) -> Tuple[Observation, Reward, bool, Dict[str, Any]]:
         """
@@ -152,10 +164,10 @@ class SupportSentinelEnv:
             )
             return self._get_observation(), reward, self.done, {}
 
-        # --- 2. Update Environment State (SLAs) ---
+        # --- 2. Update Environment State (SLAs and Sentiment Decay) ---
         # For sla_triage, SLA is handled by the grader, not per step.
         if self.task_id != "sla_triage":
-            self._update_slas()
+            self._update_slas(feedback_log)
 
         # --- 3. Check for Termination Conditions ---
         if self.step_number >= self.max_steps:
