@@ -4,20 +4,24 @@ Baseline inference script for SupportSentinelEnv.
 import json
 import uuid
 import httpx
-from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 API_BASE_URL = "http://localhost:7860"
 http_client = httpx.Client(base_url=API_BASE_URL)
 
-def log_event(event_type: str, **kwargs):
-    """Logs a JSON event."""
-    log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "event": event_type,
-        **kwargs
-    }
-    print(json.dumps(log_entry), flush=True)
+def log_start(task_id: str, env_name: str, model: str) -> None:
+    """Log episode start in required format."""
+    print(f"START task={task_id} env={env_name} model={model}", flush=True)
+
+def log_step(step_num: int, action: str, reward: float, done: bool, error: Optional[str] = None) -> None:
+    """Log individual step in required format."""
+    error_str = f"error={error}" if error else "error=null"
+    print(f"STEP step={step_num} action={action} reward={reward:.3f} done={str(done).lower()} {error_str}", flush=True)
+
+def log_end(success: bool, total_steps: int, final_score: float, rewards_list: List[float]) -> None:
+    """Log episode end in required format."""
+    rewards_str = ",".join(f"{r:.3f}" for r in rewards_list)
+    print(f"END success={str(success).lower()} steps={total_steps} score={final_score:.3f} rewards=[{rewards_str}]", flush=True)
 
 def get_action(task_id: str, observation: dict, step: int = 0) -> dict:
     """
@@ -83,7 +87,7 @@ def get_action(task_id: str, observation: dict, step: int = 0) -> dict:
 def run_episode(task_id: str, seed: int):
     """Run a single episode."""
     session_id = f"ep_{task_id}_{seed}_{uuid.uuid4().hex[:8]}"
-    log_event("START", task=task_id, env="SupportSentinelEnv", model="baseline_agent")
+    log_start(task_id, "SupportSentinelEnv", "baseline_agent")
     
     rewards = []
     step_count = 0
@@ -97,6 +101,7 @@ def run_episode(task_id: str, seed: int):
         done = False
         while not done and step_count < 20:
             action = get_action(task_id, observation, step_count)
+            action_json = json.dumps(action)
             
             # Step
             response = http_client.post(f"/step?session_id={session_id}", json=action)
@@ -108,14 +113,14 @@ def run_episode(task_id: str, seed: int):
             
             reward_score = result["reward"]["score"]
             rewards.append(reward_score)
+            log_step(step_count + 1, action_json, reward_score, done, error=None)
             step_count += 1
 
         score = sum(rewards)
-        log_event("END", success=True, steps=step_count, score=f"{score:.3f}", rewards=rewards)
+        log_end(success=True, total_steps=step_count, final_score=score, rewards_list=rewards)
 
     except Exception as e:
-        log_event("ERROR", message=str(e))
-        log_event("END", success=False, steps=step_count, score="0.000", rewards=rewards)
+        log_end(success=False, total_steps=step_count, final_score=0.0, rewards_list=rewards)
 
 def main():
     tasks = ["sla_triage", "sentiment_recovery", "queue_optimization"]
