@@ -7,23 +7,34 @@ import uuid
 import httpx
 from typing import List, Optional
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:7860")
-MODEL_NAME = os.getenv("MODEL_NAME", "baseline_agent")
-http_client = httpx.Client(base_url=API_BASE_URL)
+# Validate HF_TOKEN
+hf_token = os.getenv("HF_TOKEN")
+if not hf_token:
+    raise ValueError("HF_TOKEN environment variable is required")
+
+# Import OpenAI (required by hackathon rules)
+from openai import OpenAI
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+
+# Configuration
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
+http_client = httpx.Client(base_url=ENV_BASE_URL)
 
 def log_start(task_id: str, env_name: str, model: str) -> None:
-    """Log episode start in required format."""
-    print(f"START task={task_id} env={env_name} model={model}", flush=True)
+    """Log episode start in required format with square brackets."""
+    print(f"[START] task={task_id} env={env_name} model={model}", flush=True)
 
 def log_step(step_num: int, action: str, reward: float, done: bool, error: Optional[str] = None) -> None:
-    """Log individual step in required format."""
+    """Log individual step in required format with square brackets."""
     error_str = f"error={error}" if error else "error=null"
-    print(f"STEP step={step_num} action={action} reward={reward:.2f} done={str(done).lower()} {error_str}", flush=True)
+    print(f"[STEP] step={step_num} action={action} reward={reward:.2f} done={str(done).lower()} {error_str}", flush=True)
 
-def log_end(success: bool, total_steps: int, final_score: float, rewards_list: List[float]) -> None:
-    """Log episode end in required format."""
+def log_end(success: bool, total_steps: int, rewards_list: List[float]) -> None:
+    """Log episode end in required format with square brackets."""
     rewards_str = ",".join(f"{r:.2f}" for r in rewards_list)
-    print(f"END success={str(success).lower()} steps={total_steps} score={final_score:.2f} rewards=[{rewards_str}]", flush=True)
+    print(f"[END] success={str(success).lower()} steps={total_steps} rewards={rewards_str}", flush=True)
 
 def get_action(task_id: str, observation: dict, step: int = 0) -> dict:
     """
@@ -93,6 +104,7 @@ def run_episode(task_id: str, seed: int):
     
     rewards = []
     step_count = 0
+    success = False
     
     try:
         # Reset
@@ -110,19 +122,28 @@ def run_episode(task_id: str, seed: int):
             response.raise_for_status()
             
             result = response.json()
-            observation = result["observation"]
-            done = result["done"]
+            observation = result.get("observation", {})
+            done = result.get("done", False)
             
-            reward_score = result["reward"]["score"]
+            reward_obj = result.get("reward", {})
+            if isinstance(reward_obj, dict):
+                reward_score = float(reward_obj.get("score", 0))
+            elif isinstance(reward_obj, (int, float)):
+                reward_score = float(reward_obj)
+            else:
+                reward_score = float(reward_obj) if reward_obj else 0
+            
             rewards.append(reward_score)
             log_step(step_count + 1, action_json, reward_score, done, error=None)
             step_count += 1
 
-        score = sum(rewards)
-        log_end(success=True, total_steps=step_count, final_score=score, rewards_list=rewards)
+        success = True
 
     except Exception as e:
-        log_end(success=False, total_steps=step_count, final_score=0.0, rewards_list=rewards)
+        success = False
+    
+    finally:
+        log_end(success=success, total_steps=step_count, rewards_list=rewards)
 
 def main():
     tasks = ["sla_triage", "sentiment_recovery", "queue_optimization"]
