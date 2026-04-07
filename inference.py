@@ -9,19 +9,21 @@ import time
 from functools import wraps
 from typing import List, Optional
 
-# Validate HF_TOKEN
+# Configuration - Define BEFORE using
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
+
+# Validate HF_TOKEN - MUST be present
 hf_token = os.getenv("HF_TOKEN")
 if not hf_token:
     raise ValueError("HF_TOKEN environment variable is required")
 
-# Import OpenAI (required by hackathon rules)
+# Import OpenAI and configure with HF_TOKEN as API key and API_BASE_URL as base
 from openai import OpenAI
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+client = OpenAI(base_url=API_BASE_URL, api_key=hf_token)
 
-# Configuration
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
+# HTTP client for environment interaction
 http_client = httpx.Client(base_url=ENV_BASE_URL, timeout=30.0)
 
 def log_start(task_id: str, env_name: str, model: str) -> None:
