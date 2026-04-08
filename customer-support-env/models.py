@@ -59,7 +59,16 @@ class Reward(BaseModel):
     def validate_score_range(cls, v):
         """Ensure score is strictly between 0 and 1 (exclusive on both ends)."""
         if not (0 < v < 1):
-            raise ValueError(f"Score must be strictly between 0 and 1 (exclusive), got {v}")
+            # Clamp to valid range rather than raising error for submission safety
+            v = max(0.01, min(0.99, v))
+        return v
+    
+    @field_validator('partial_scores', mode='before')
+    @classmethod
+    def validate_partial_scores(cls, v):
+        """Ensure all partial_scores values are strictly between 0 and 1."""
+        if isinstance(v, dict):
+            return {k: max(0.01, min(0.99, float(val))) for k, val in v.items()}
         return v
     
     @field_validator('cumulative_score')

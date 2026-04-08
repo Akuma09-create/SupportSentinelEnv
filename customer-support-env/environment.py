@@ -191,6 +191,12 @@ class SupportSentinelEnv:
         else:
             reward = grader(action.dict(), initial_tickets_state, self.tickets, self.cumulative_score, self.done, self.max_steps)
 
+        # CRITICAL: Add defensive clamping to reward before use
+        # This ensures score and cumulative_score are strictly in (0.01, 0.99)
+        if reward:
+            reward.score = max(0.01, min(0.99, reward.score))
+            reward.cumulative_score = max(0.01, min(0.99, reward.cumulative_score))
+        
         # For multi-step tasks, the final cumulative score is the final reward.
         # For single-step tasks, we add the score to the (zero) base.
         # CRITICAL: Clamp cumulative_score to stay within (0, 1) for framework validation
