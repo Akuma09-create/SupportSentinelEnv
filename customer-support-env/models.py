@@ -2,7 +2,7 @@
 Pydantic models for the SupportSentinelEnv environment.
 """
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class Ticket(BaseModel):
@@ -49,6 +49,8 @@ class Observation(BaseModel):
 
 class Reward(BaseModel):
     """Represents the reward for a step."""
+    model_config = ConfigDict(validate_assignment=True)
+    
     score: float
     partial_scores: Dict[str, float]
     feedback: str
