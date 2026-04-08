@@ -249,7 +249,7 @@ new_func = '''def grade_queue_optimization(action: Dict[str, Any], initial_ticke
     max_possible_value = sum(t.value for t in initial_tickets)
     
     score = total_value / max_possible_value if max_possible_value > 0 else 0.01
-    score = min(score, 1.0)
+    score = min(score, 0.99)
 
     return Reward(
         score=score,

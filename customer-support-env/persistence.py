@@ -139,9 +139,9 @@ def get_task_statistics(task_id: str) -> Dict:
     
     return {
         "total_episodes": row[0] or 0,
-        "avg_score": row[1] or 0.0,
-        "max_score": row[2] or 0.0,
-        "min_score": row[3] or 0.0
+        "avg_score": row[1] or 0.01,
+        "max_score": row[2] or 0.01,
+        "min_score": row[3] or 0.01
     }
 
 # Initialize on import
