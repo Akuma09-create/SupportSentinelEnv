@@ -61,6 +61,15 @@ class Reward(BaseModel):
         if not (0 < v < 1):
             raise ValueError(f"Score must be strictly between 0 and 1 (exclusive), got {v}")
         return v
+    
+    @field_validator('cumulative_score')
+    @classmethod
+    def validate_cumulative_score_range(cls, v):
+        """Ensure cumulative score is strictly between 0 and 1 (exclusive on both ends)."""
+        if not (0 < v < 1):
+            # Clamp to valid range rather than raising error
+            v = max(0.01, min(0.99, v))
+        return v
 
 
 class EnvState(BaseModel):

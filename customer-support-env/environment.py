@@ -64,7 +64,7 @@ class SupportSentinelEnv:
         self.tickets: List[Ticket] = []
         self.step_number = 0
         self.max_steps = self.task_def["max_steps"]
-        self.cumulative_score = 0.0
+        self.cumulative_score = 0.01  # Start at minimum valid score (0 < 0.01 < 1)
         self.done = False
 
         self._reset_internal_state()
@@ -73,7 +73,7 @@ class SupportSentinelEnv:
         """Resets the environment to its initial state for the current task."""
         self.tickets = [t.copy(deep=True) for t in self.task_def["tickets"]]
         self.step_number = 0
-        self.cumulative_score = 0.0
+        self.cumulative_score = 0.01  # Reset to minimum valid score
         self.done = False
 
     def reset(self) -> Observation:
@@ -160,7 +160,7 @@ class SupportSentinelEnv:
                 score=0.01,
                 partial_scores={"validation_error": 0.01},
                 feedback=f"Invalid action: {e}. Episode terminated.",
-                cumulative_score=self.cumulative_score
+                cumulative_score=max(0.01, min(0.99, self.cumulative_score))
             )
             return self._get_observation(), reward, self.done, {}
 
@@ -193,10 +193,11 @@ class SupportSentinelEnv:
 
         # For multi-step tasks, the final cumulative score is the final reward.
         # For single-step tasks, we add the score to the (zero) base.
+        # CRITICAL: Clamp cumulative_score to stay within (0, 1) for framework validation
         if self.done and self.task_id != "sla_triage":
-             self.cumulative_score = reward.cumulative_score
+             self.cumulative_score = max(0.01, min(0.99, reward.cumulative_score))
         elif self.task_id == "sla_triage":
-             self.cumulative_score += reward.score
+             self.cumulative_score = max(0.01, min(0.99, self.cumulative_score + reward.score))
         # On intermediate steps, cumulative_score is handled by the grader logic.
         
         # --- 5. Return results ---
