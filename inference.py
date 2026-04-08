@@ -4,6 +4,7 @@ OpenEnv-compliant with LiteLLM proxy integration.
 """
 import json
 import os
+import sys
 import uuid
 import httpx
 import time
@@ -132,6 +133,7 @@ def get_action(task_id: str, observation: dict, step: int = 0) -> dict:
         system_prompt = SYSTEM_PROMPTS.get(task_id, "You are a helpful AI agent. Return only valid JSON.")
         
         # Call LLM (will be routed through LiteLLM proxy via API_BASE_URL)
+        print(f"[DEBUG] Calling LLM for task {task_id} with base_url={API_BASE_URL[:50]}...", file=sys.stderr, flush=True)
         response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
@@ -141,6 +143,7 @@ def get_action(task_id: str, observation: dict, step: int = 0) -> dict:
             temperature=0.7,
             max_tokens=200
         )
+        print(f"[DEBUG] LLM response received for task {task_id}", file=sys.stderr, flush=True)
         
         # Parse LLM response
         action_text = response.choices[0].message.content.strip()
@@ -152,7 +155,8 @@ def get_action(task_id: str, observation: dict, step: int = 0) -> dict:
             return get_fallback_action(task_id, observation)
             
     except Exception as e:
-        # If LLM call fails, use fallback rule-based action
+        # If LLM call fails, log it and use fallback
+        print(f"[ERROR] LLM call failed: {type(e).__name__}: {str(e)}", file=sys.stderr, flush=True)
         return get_fallback_action(task_id, observation)
 
 def run_episode(task_id: str, seed: int) -> None:
