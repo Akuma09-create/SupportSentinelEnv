@@ -2,7 +2,7 @@
 Pydantic models for the SupportSentinelEnv environment.
 """
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Ticket(BaseModel):
@@ -53,6 +53,14 @@ class Reward(BaseModel):
     partial_scores: Dict[str, float]
     feedback: str
     cumulative_score: float
+    
+    @field_validator('score')
+    @classmethod
+    def validate_score_range(cls, v):
+        """Ensure score is strictly between 0 and 1 (exclusive on both ends)."""
+        if not (0 < v < 1):
+            raise ValueError(f"Score must be strictly between 0 and 1 (exclusive), got {v}")
+        return v
 
 
 class EnvState(BaseModel):

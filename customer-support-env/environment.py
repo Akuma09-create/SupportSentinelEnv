@@ -157,8 +157,8 @@ class SupportSentinelEnv:
             # Invalid action format or parameters
             self.done = True # End episode on invalid action
             reward = Reward(
-                score=0.0,
-                partial_scores={"validation_error": 0.0},
+                score=0.01,
+                partial_scores={"validation_error": 0.01},
                 feedback=f"Invalid action: {e}. Episode terminated.",
                 cumulative_score=self.cumulative_score
             )

@@ -81,6 +81,8 @@ def grade_sentiment_recovery(action: Dict[str, Any], initial_tickets: List[Ticke
     if not done:
         sentiment_change = final_ticket.sentiment_score - initial_ticket.sentiment_score
         step_score = 0.5 + (sentiment_change * 0.5)  # Nudge around a neutral 0.5
+        # Clamp score to valid range (0, 1) - strictly between 0 and 1
+        step_score = max(0.01, min(0.99, step_score))
         return Reward(
             score=step_score,
             partial_scores={"sentiment_change": sentiment_change},

@@ -43,8 +43,8 @@ def post_request(endpoint: str, payload: dict, session_id: str = None) -> tuple:
 @run_test
 def test_sla_triage():
     """Tests the sla_triage task with the optimal prioritization."""
-    # Expected score: 1.0 (5/5 tickets meet SLA)
-    expected_score = 1.0
+    # Expected score: 0.99 (5/5 tickets meet SLA, clamped to 0.99)
+    expected_score = 0.99
     
     # Reset environment
     _, session_id = post_request("/reset", {"task_id": "sla_triage", "seed": 42})
