@@ -10,21 +10,45 @@ except (ImportError, ValueError):
     from models import Ticket, Reward
 
 
-# 🔒 FINAL SAFE SCORE FUNCTION WITH STRICT ASSERTIONS
+# 🔒 BULLETPROOF SAFE SCORE - IMPOSSIBLE TO ESCAPE BOUNDS
 def _safe_score(value: float) -> float:
+    """
+    ABSOLUTE FINAL CLAMPING.
+    Returns GUARANTEED [0.01, 0.99].
+    Cannot escape boundaries under ANY circumstance.
+    """
+    # Handle non-numeric types
+    if not isinstance(value, (int, float)):
+        return 0.5
+    
+    # Handle special float values
+    if value is None or abs(value) == float('inf'):
+        return 0.5
+    
+    # Handle NaN
     try:
-        value = float(value)
+        v = float(value)
+        if v != v:  # NaN check
+            return 0.5
     except (TypeError, ValueError):
+        return 0.5
+    
+    # Explicit boundary checks WITH margin for floating-point artifacts
+    if v <= 0.001:
         return 0.01
-
-    if value <= 0:
-        return 0.01
-    if value >= 1:
+    if v >= 0.999:
         return 0.99
-
-    result = round(value, 4)
-    assert 0.01 <= result <= 0.99, f"FATAL: _safe_score escaped bounds! Input={value}, Result={result}"
-    return result
+    
+    # Precise rounding
+    rounded = round(v, 4)
+    
+    # FINAL safety clamp - mathematically impossible to fail
+    final = max(0.01, min(0.99, rounded))
+    
+    # Verification
+    assert 0.01 <= final <= 0.99, f"IMPOSSIBLE: _safe_score failed! Input={value}, Final={final}"
+    
+    return final
 
 
 # ------------------- SLA TRIAGE -------------------

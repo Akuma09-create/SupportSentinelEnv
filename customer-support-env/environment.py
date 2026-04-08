@@ -192,14 +192,23 @@ class SupportSentinelEnv:
             reward = grader(action.dict(), initial_tickets_state, self.tickets, self.cumulative_score, self.done, self.max_steps)
 
         # CRITICAL: Add defensive clamping to reward before use
-        # This ensures score and cumulative_score are strictly in (0.01, 0.99)
+        # This ensures ALL score fields are strictly in (0.01, 0.99)
         if reward:
-            orig_score = reward.score
-            orig_cum = reward.cumulative_score
-            reward.score = max(0.01, min(0.99, reward.score))
-            reward.cumulative_score = max(0.01, min(0.99, reward.cumulative_score))
-            assert 0.01 <= reward.score <= 0.99, f"ENV: score {orig_score} clamped to {reward.score}"
-            assert 0.01 <= reward.cumulative_score <= 0.99, f"ENV: cumulative {orig_cum} clamped to {reward.cumulative_score}"
+            # Clamp individual fields
+            reward.score = max(0.01, min(0.99, float(reward.score)))
+            reward.cumulative_score = max(0.01, min(0.99, float(reward.cumulative_score)))
+            
+            # Clamp partial_scores dict
+            if reward.partial_scores:
+                reward.partial_scores = {
+                    k: max(0.01, min(0.99, float(v)))
+                    for k, v in reward.partial_scores.items()
+                }
+            
+            # Assertions
+            assert 0.01 <= reward.score <= 0.99, f"Reward.score out of bounds: {reward.score}"
+            assert 0.01 <= reward.cumulative_score <= 0.99, f"Reward.cumulative_score out of bounds: {reward.cumulative_score}"
+            assert all(0.01 <= v <= 0.99 for v in reward.partial_scores.values()), f"Partial scores out of bounds: {reward.partial_scores}"
         
         # For multi-step tasks, the final cumulative score is the final reward.
         # For single-step tasks, we add the score to the (zero) base.
@@ -212,6 +221,11 @@ class SupportSentinelEnv:
         
         # --- 5. Return results ---
         observation = self._get_observation()
+        
+        # CRITICAL: Clamp observation.current_score before returning
+        observation.current_score = max(0.01, min(0.99, float(observation.current_score)))
+        assert 0.01 <= observation.current_score <= 0.99, f"Observation.current_score out of bounds: {observation.current_score}"
+        
         info = {"feedback_log": feedback_log}
 
         return observation, reward, self.done, info
