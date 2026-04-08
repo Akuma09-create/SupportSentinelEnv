@@ -13,22 +13,20 @@ from typing import List, Optional, Any
 
 from openai import OpenAI
 
-# Configuration - API_BASE_URL and API_KEY MUST be provided by validator
-API_BASE_URL = os.environ.get("API_BASE_URL")
-if API_BASE_URL is None:
-    raise ValueError("API_BASE_URL environment variable is required (LiteLLM proxy endpoint)")
-
-API_KEY = os.environ.get("API_KEY")
-if API_KEY is None:
-    raise ValueError("API_KEY environment variable is required")
-
+# Configuration
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
+
+# Validate HF_TOKEN (injected by hackathon framework)
+HF_TOKEN = os.getenv("HF_TOKEN")
+if HF_TOKEN is None:
+    raise ValueError("HF_TOKEN environment variable is required")
 
 # OpenAI client (configured to use LiteLLM proxy)
 client = OpenAI(
     base_url=API_BASE_URL,
-    api_key=API_KEY
+    api_key=HF_TOKEN
 )
 
 # HTTP client

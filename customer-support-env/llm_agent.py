@@ -13,12 +13,11 @@ import httpx
 # ============================================================================
 # ENVIRONMENT VARIABLES - As per hackathon requirements
 # ============================================================================
-API_BASE_URL = os.environ.get("API_BASE_URL")
-if API_BASE_URL is None:
-    raise ValueError("API_BASE_URL environment variable is required (LiteLLM proxy endpoint)")
-
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
-API_KEY = os.environ["API_KEY"]  # Required - injected by hackathon framework
+HF_TOKEN = os.getenv("HF_TOKEN")
+if HF_TOKEN is None:
+    raise ValueError("HF_TOKEN environment variable is required")
 
 # Optional - if you use from_docker_image():
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
@@ -26,7 +25,7 @@ LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 # ============================================================================
 # OpenAI Client Configuration - Using environment variables
 # ============================================================================
-client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 
 # ============================================================================
 # System Prompts for Each Task
