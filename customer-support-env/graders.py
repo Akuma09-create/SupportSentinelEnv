@@ -19,6 +19,11 @@ def _clamp_score(value: float, min_val: float = 0.01, max_val: float = 0.99) -> 
     return max(min_val, min(max_val, value))
 
 
+def _clamp_partial(scores: Dict[str, float]) -> Dict[str, float]:
+    """Clamp all values in a partial_scores dict to stay within (0, 1)."""
+    return {k: _clamp_score(v) for k, v in scores.items()}
+
+
 def grade_sla_triage(
     action: Dict[str, Any],
     initial_tickets: List[Ticket],
@@ -28,7 +33,6 @@ def grade_sla_triage(
     cumulative_score = _clamp_score(cumulative_score)
 
     feedback_lines = []
-    partial_scores = {}
 
     try:
         prioritized_ids = action["parameters"]["ticket_ids"]
@@ -38,7 +42,7 @@ def grade_sla_triage(
         error_score = _clamp_score(0.01)
         return Reward(
             score=error_score,
-            partial_scores={"validation_error": error_score},
+            partial_scores=_clamp_partial({"validation_error": 0.01}),
             feedback=f"Invalid action format: {e}",
             cumulative_score=_clamp_score(cumulative_score + error_score),
         )
@@ -49,7 +53,7 @@ def grade_sla_triage(
         error_score = _clamp_score(0.01)
         return Reward(
             score=error_score,
-            partial_scores={"validation_error": error_score},
+            partial_scores=_clamp_partial({"validation_error": 0.01}),
             feedback="Error: ticket_ids must contain all unique ticket IDs exactly once.",
             cumulative_score=_clamp_score(cumulative_score + error_score),
         )
@@ -73,14 +77,13 @@ def grade_sla_triage(
 
     raw_score = resolved_within_sla / total_tickets if total_tickets > 0 else 0.01
     score = _clamp_score(raw_score)
-    partial_scores["sla_compliance"] = score
 
     feedback = "SLA Triage Result:\n" + "\n".join(feedback_lines)
     feedback += f"\nFinal Score: {resolved_within_sla}/{total_tickets} tickets met their SLA."
 
     return Reward(
         score=score,
-        partial_scores=partial_scores,
+        partial_scores=_clamp_partial({"sla_compliance": raw_score}),
         feedback=feedback,
         cumulative_score=_clamp_score(cumulative_score + score),
     )
@@ -106,9 +109,9 @@ def grade_sentiment_recovery(
 
         return Reward(
             score=step_score,
-            partial_scores={"sentiment_change": sentiment_change},
+            partial_scores=_clamp_partial({"sentiment_change": raw_step_score}),
             feedback=f"Sentiment changed by {sentiment_change:.2f}.",
-            cumulative_score=cumulative_score,
+            cumulative_score=_clamp_score(cumulative_score + step_score),  # accumulate every step
         )
 
     final_sentiment = final_ticket.sentiment_score
@@ -127,21 +130,22 @@ def grade_sentiment_recovery(
             f"Final sentiment: {final_sentiment:.2f}."
         )
 
-    raw_score = (sentiment_score_component * sla_bonus) + (0.2 if final_ticket.status == "resolved" else 0.0)
+    is_resolved = final_ticket.status == "resolved"
+    resolution_bonus = 0.2 if is_resolved else 0.01  # never 0.0
+
+    raw_score = (sentiment_score_component * sla_bonus) + (0.2 if is_resolved else 0.0)
     final_score = _clamp_score(raw_score)
 
-    if final_ticket.status == "resolved":
+    if is_resolved:
         feedback += " Ticket resolved, adding bonus."
-
-    partial_scores = {
-        "sentiment_component": sentiment_score_component,
-        "sla_bonus": sla_bonus,
-        "resolution_bonus": 0.2 if final_ticket.status == "resolved" else 0.0,
-    }
 
     return Reward(
         score=final_score,
-        partial_scores=partial_scores,
+        partial_scores=_clamp_partial({
+            "sentiment_component": sentiment_score_component,
+            "sla_bonus": sla_bonus,
+            "resolution_bonus": resolution_bonus,
+        }),
         feedback=feedback,
         cumulative_score=_clamp_score(cumulative_score + final_score),
     )
@@ -161,9 +165,9 @@ def grade_queue_optimization(
         error_score = _clamp_score(0.01)
         return Reward(
             score=error_score,
-            partial_scores={},
+            partial_scores=_clamp_partial({"no_resolve_action": 0.01}),
             feedback="No resolve action taken.",
-            cumulative_score=cumulative_score,
+            cumulative_score=_clamp_score(cumulative_score + error_score),
         )
 
     ticket_id_to_resolve = action.get("parameters", {}).get("ticket_id")
@@ -171,9 +175,9 @@ def grade_queue_optimization(
         error_score = _clamp_score(0.01)
         return Reward(
             score=error_score,
-            partial_scores={},
+            partial_scores=_clamp_partial({"missing_ticket_id": 0.01}),
             feedback="Resolve action taken, but no ticket_id specified.",
-            cumulative_score=cumulative_score,
+            cumulative_score=_clamp_score(cumulative_score + error_score),
         )
 
     ticket_map = {t.ticket_id: t for t in initial_tickets}
@@ -182,17 +186,18 @@ def grade_queue_optimization(
         error_score = _clamp_score(0.01)
         return Reward(
             score=error_score,
-            partial_scores={},
+            partial_scores=_clamp_partial({"ticket_not_found": 0.01}),
             feedback=f"Ticket {ticket_id_to_resolve} not found.",
-            cumulative_score=cumulative_score,
+            cumulative_score=_clamp_score(cumulative_score + error_score),
         )
 
-    step_reward = _clamp_score(getattr(ticket, "value", 0.01))
-    feedback = f"Resolved ticket {ticket_id_to_resolve} with value {getattr(ticket, 'value', 0.0):.2f}."
+    raw_value = getattr(ticket, "value", 0.01)
+    step_reward = _clamp_score(raw_value)
+    feedback = f"Resolved ticket {ticket_id_to_resolve} with value {raw_value:.2f}."
 
     return Reward(
         score=step_reward,
-        partial_scores={"resolved_value": getattr(ticket, "value", 0.0)},
+        partial_scores=_clamp_partial({"resolved_value": raw_value}),
         feedback=feedback,
         cumulative_score=_clamp_score(cumulative_score + step_reward),
     )
