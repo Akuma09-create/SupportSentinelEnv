@@ -13,21 +13,17 @@ import httpx
 # ============================================================================
 # ENVIRONMENT VARIABLES - As per hackathon requirements
 # ============================================================================
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:7860")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-3.5-turbo")
-HF_TOKEN = os.getenv("HF_TOKEN")  # NO default - required
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
+API_KEY = os.environ["API_KEY"]  # Required - injected by hackathon framework
 
 # Optional - if you use from_docker_image():
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
-# Use placeholder if HF_TOKEN not provided (for local testing)
-if not HF_TOKEN:
-    HF_TOKEN = "test-token-local"
-
 # ============================================================================
 # OpenAI Client Configuration - Using environment variables
 # ============================================================================
-client = OpenAI(api_key=HF_TOKEN)
+client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
 # ============================================================================
 # System Prompts for Each Task
@@ -61,21 +57,19 @@ Format: {"action_type": "resolve", "parameters": {"ticket_id": "..."}}"""
 http_client = httpx.Client(base_url=API_BASE_URL, timeout=30.0)
 
 # ============================================================================
-# Structured Logging Functions - START/STEP/END format (exactly as required)
-# ============================================================================
 def log_start(task_id: str, env_name: str, model: str) -> None:
     """Log episode start in required format."""
-    print(f"START task={task_id} env={env_name} model={model}", flush=True)
+    print(f"[START] task={task_id} env={env_name} model={model}", flush=True)
 
 def log_step(step_num: int, action: str, reward: float, done: bool, error: Optional[str] = None) -> None:
     """Log individual step in required format."""
     error_str = f"error={error}" if error else "error=null"
-    print(f"STEP step={step_num} action={action} reward={reward:.3f} done={str(done).lower()} {error_str}", flush=True)
+    print(f"[STEP] step={step_num} action={action} reward={reward:.2f} done={str(done).lower()} {error_str}", flush=True)
 
 def log_end(success: bool, total_steps: int, final_score: float, rewards_list: List[float]) -> None:
     """Log episode end in required format."""
-    rewards_str = ",".join(f"{r:.3f}" for r in rewards_list)
-    print(f"END success={str(success).lower()} steps={total_steps} score={final_score:.3f} rewards=[{rewards_str}]", flush=True)
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards_list)
+    print(f"[END] success={str(success).lower()} steps={total_steps} rewards={rewards_str}", flush=True)
 
 # ============================================================================
 # LLM Agent Class
@@ -118,7 +112,7 @@ class LLMAgent:
         try:
             # All LLM calls use the OpenAI client configured via environment variables
             response = client.chat.completions.create(
-                model=self.model,
+                model=MODEL_NAME,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -238,7 +232,10 @@ What action should we take next?"""
     
     def run_episode(self) -> Dict[str, Any]:
         """Run a complete episode with structured logging."""
-        log_start(self.task_id, "SupportSentinelEnv", self.model)
+        log_start(self.task_id, "SupportSentinelEnv", MODEL_NAME)
+        
+        final_score = 0.0
+        success = False
         
         try:
             observation = self.reset()
@@ -261,9 +258,6 @@ What action should we take next?"""
             final_score = sum(self.rewards) if self.rewards else 0.0
             success = final_score > 0.5  # Success threshold
             
-            # Log end (END format required)
-            log_end(success, self.step_count, final_score, self.rewards)
-            
             return {
                 "task_id": self.task_id,
                 "steps": self.step_count,
@@ -273,8 +267,9 @@ What action should we take next?"""
             }
         except Exception as e:
             print(f"[ERROR] Episode failed: {e}", file=sys.stderr)
-            log_end(False, self.step_count, 0.0, self.rewards)
-            raise
+        finally:
+            # Always log end, even on exception
+            log_end(success, self.step_count, final_score, self.rewards)
 
 # ============================================================================
 # Main Entry Point
@@ -284,16 +279,12 @@ def main():
     tasks = ["sla_triage", "sentiment_recovery", "queue_optimization"]
     
     for task_id in tasks:
-        print(f"\n{'='*60}", flush=True)
-        print(f"Running task: {task_id}", flush=True)
-        print(f"{'='*60}\n", flush=True)
-        
         try:
             agent = LLMAgent(task_id, model=MODEL_NAME)
-            result = agent.run_episode()
-            print(f"\nTask {task_id} completed: {result}\n", flush=True)
+            agent.run_episode()
         except Exception as e:
-            print(f"\nTask {task_id} failed: {e}\n", file=sys.stderr, flush=True)
+            # Error details logged to stderr in run_episode's finally block
+            pass
 
 if __name__ == "__main__":
     main()
