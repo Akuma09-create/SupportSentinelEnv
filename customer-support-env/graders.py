@@ -60,11 +60,14 @@ def grade_sla_triage(action: Dict[str, Any], initial_tickets: List[Ticket], fina
     feedback = "SLA Triage Result:\n" + "\n".join(feedback_lines)
     feedback += f"\nFinal Score: {resolved_within_sla}/{total_tickets} tickets met their SLA."
 
+    # Clamp cumulative_score to valid range (0, 1)
+    final_cumulative = max(0.01, min(0.99, cumulative_score + score))
+    
     return Reward(
         score=score,
         partial_scores=partial_scores,
         feedback=feedback,
-        cumulative_score=cumulative_score + score
+        cumulative_score=final_cumulative
     )
 
 
@@ -123,12 +126,15 @@ def grade_sentiment_recovery(action: Dict[str, Any], initial_tickets: List[Ticke
         "resolution_bonus": resolution_bonus
     }
 
+    # Clamp cumulative_score to valid range (0, 1)
+    final_cumulative = max(0.01, min(0.99, cumulative_score + final_score))
+    
     # When done, the reward's 'score' and 'cumulative_score' should both be the final calculated score.
     return Reward(
         score=final_score,
         partial_scores=partial_scores,
         feedback=feedback,
-        cumulative_score=cumulative_score + final_score
+        cumulative_score=final_cumulative
     )
 
 
@@ -165,11 +171,14 @@ def grade_queue_optimization(action: Dict[str, Any], initial_tickets: List[Ticke
     # Clamp to valid range (0, 1)
     step_reward = max(0.01, min(0.99, initial_ticket.value))
     
+    # Clamp cumulative_score to valid range (0, 1)
+    final_cumulative = max(0.01, min(0.99, cumulative_score + step_reward))
+    
     return Reward(
         score=step_reward,
         partial_scores={"resolved_value": initial_ticket.value},
         feedback=f"Successfully resolved ticket {ticket_id_to_resolve} worth {initial_ticket.value:.1f}. Step reward: {step_reward:.1f}",
-        cumulative_score=cumulative_score + step_reward
+        cumulative_score=final_cumulative
     )
 
 
