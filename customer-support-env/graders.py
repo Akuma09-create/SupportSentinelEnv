@@ -10,13 +10,19 @@ except (ImportError, ValueError):
     from models import Ticket, Reward
 
 
-def _clamp_score(value: float, min_val: float = 0.001, max_val: float = 0.999) -> float:
-    """Clamp a numeric score strictly within (0, 1)."""
+# 🔒 FINAL SAFE SCORE FUNCTION
+def _safe_score(value: float) -> float:
     try:
         value = float(value)
     except (TypeError, ValueError):
-        return min_val
-    return max(min_val, min(max_val, value))
+        return 0.01
+
+    if value <= 0:
+        return 0.01
+    if value >= 1:
+        return 0.99
+
+    return round(value, 4)
 
 
 # ------------------- SLA TRIAGE -------------------
@@ -28,57 +34,55 @@ def grade_sla_triage(
     cumulative_score: float
 ) -> Reward:
 
-    cumulative_score = _clamp_score(cumulative_score)
+    cumulative_score = _safe_score(cumulative_score)
     feedback_lines = []
 
     try:
         prioritized_ids = action["parameters"]["ticket_ids"]
         if not isinstance(prioritized_ids, list) or len(prioritized_ids) != len(initial_tickets):
-            raise ValueError("Invalid 'ticket_ids' format.")
+            raise ValueError("Invalid ticket_ids format")
     except Exception as e:
-        error_score = _clamp_score(0.01)
+        error_score = _safe_score(0.01)
         return Reward(
             score=error_score,
             partial_scores={"validation_error": error_score},
-            feedback=f"Invalid action format: {e}",
-            cumulative_score=_clamp_score(cumulative_score + error_score),
+            feedback=f"Invalid action: {e}",
+            cumulative_score=_safe_score(cumulative_score + error_score),
         )
 
     ticket_map = {t.ticket_id: t for t in initial_tickets}
 
     if len(set(prioritized_ids)) != len(initial_tickets) or set(prioritized_ids) != set(ticket_map.keys()):
-        error_score = _clamp_score(0.01)
+        error_score = _safe_score(0.01)
         return Reward(
             score=error_score,
             partial_scores={"validation_error": error_score},
-            feedback="ticket_ids must contain all unique ticket IDs exactly once.",
-            cumulative_score=_clamp_score(cumulative_score + error_score),
+            feedback="ticket_ids must be unique and complete",
+            cumulative_score=_safe_score(cumulative_score + error_score),
         )
 
-    steps_elapsed = 0
-    resolved_within_sla = 0
-    total_tickets = len(initial_tickets)
+    steps = 0
+    success = 0
+    total = len(initial_tickets)
 
-    for ticket_id in prioritized_ids:
-        steps_elapsed += 1
-        ticket = ticket_map[ticket_id]
+    for tid in prioritized_ids:
+        steps += 1
+        ticket = ticket_map[tid]
 
-        if steps_elapsed <= ticket.sla_steps_remaining:
-            resolved_within_sla += 1
-            feedback_lines.append(f"SUCCESS: {ticket_id} resolved at step {steps_elapsed}.")
+        if steps <= ticket.sla_steps_remaining:
+            success += 1
+            feedback_lines.append(f"SUCCESS: {tid}")
         else:
-            feedback_lines.append(f"FAILURE: {ticket_id} breached at step {steps_elapsed}.")
+            feedback_lines.append(f"FAIL: {tid}")
 
-    raw_score = resolved_within_sla / total_tickets if total_tickets > 0 else 0.001
-    score = _clamp_score(raw_score)
-
-    feedback = "SLA Triage Result:\n" + "\n".join(feedback_lines)
+    raw_score = success / total if total > 0 else 0.01
+    score = _safe_score(raw_score)
 
     return Reward(
         score=score,
-        partial_scores={"sla_compliance": score},  # SAFE (already clamped)
-        feedback=feedback,
-        cumulative_score=_clamp_score(cumulative_score + score),
+        partial_scores={"sla_compliance": score},
+        feedback="\n".join(feedback_lines),
+        cumulative_score=_safe_score(cumulative_score + score),
     )
 
 
@@ -93,56 +97,49 @@ def grade_sentiment_recovery(
     max_steps: int
 ) -> Reward:
 
-    cumulative_score = _clamp_score(cumulative_score)
+    cumulative_score = _safe_score(cumulative_score)
 
-    initial_ticket = initial_tickets[0]
-    final_ticket = final_tickets[0]
+    initial = initial_tickets[0]
+    final = final_tickets[0]
 
-    # Step-wise reward
     if not done:
-        sentiment_change = final_ticket.sentiment_score - initial_ticket.sentiment_score
-        raw_step_score = 0.5 + (sentiment_change * 0.5)
-        step_score = _clamp_score(raw_step_score)
+        change = final.sentiment_score - initial.sentiment_score
+        raw = 0.5 + (change * 0.5)
+        score = _safe_score(raw)
 
         return Reward(
-            score=step_score,
-            partial_scores={"sentiment_change": step_score},
-            feedback=f"Sentiment change: {sentiment_change:.2f}",
-            cumulative_score=_clamp_score(cumulative_score + step_score),
+            score=score,
+            partial_scores={"sentiment_change": score},
+            feedback=f"Change: {change:.2f}",
+            cumulative_score=_safe_score(cumulative_score + score),
         )
 
-    # Final reward - CRITICAL: clamp intermediates BEFORE Reward creation
-    final_sentiment = final_ticket.sentiment_score
-    sentiment_component = _clamp_score((final_sentiment + 1) / 2.0)
+    sentiment = _safe_score((final.sentiment_score + 1) / 2.0)
 
-    if final_ticket.sla_breached:
-        sla_bonus = _clamp_score(0.5)
+    if final.sla_breached:
+        sla_bonus = _safe_score(0.5)
     else:
         raw_sla = (
-            final_ticket.sla_steps_remaining / final_ticket.sla_total_steps
-            if final_ticket.sla_total_steps > 0 else 0.001
+            final.sla_steps_remaining / final.sla_total_steps
+            if final.sla_total_steps > 0 else 0.01
         )
-        sla_bonus = _clamp_score(raw_sla)
+        sla_bonus = _safe_score(raw_sla)
 
-    is_resolved = final_ticket.status == "resolved"
-    resolution_bonus = _clamp_score(0.2 if is_resolved else 0.01)
+    resolved = final.status == "resolved"
+    resolution_bonus = _safe_score(0.2 if resolved else 0.01)
 
-    raw_score = (sentiment_component * sla_bonus) + resolution_bonus
-    final_score = _clamp_score(raw_score)
-
-    feedback = f"Final sentiment: {final_sentiment:.2f}"
-    if is_resolved:
-        feedback += " | Ticket resolved"
+    raw_score = (sentiment * sla_bonus) + resolution_bonus
+    final_score = _safe_score(raw_score)
 
     return Reward(
         score=final_score,
         partial_scores={
-            "sentiment_component": sentiment_component,
+            "sentiment_component": sentiment,
             "sla_bonus": sla_bonus,
             "resolution_bonus": resolution_bonus,
         },
-        feedback=feedback,
-        cumulative_score=_clamp_score(cumulative_score + final_score),
+        feedback=f"Final sentiment: {final.sentiment_score:.2f}",
+        cumulative_score=_safe_score(cumulative_score + final_score),
     )
 
 
@@ -157,47 +154,47 @@ def grade_queue_optimization(
     max_steps: int
 ) -> Reward:
 
-    cumulative_score = _clamp_score(cumulative_score)
+    cumulative_score = _safe_score(cumulative_score)
 
     if action.get("action_type") != "resolve":
-        error_score = _clamp_score(0.01)
+        err = _safe_score(0.01)
         return Reward(
-            score=error_score,
-            partial_scores={"no_resolve_action": error_score},
+            score=err,
+            partial_scores={"no_resolve_action": err},
             feedback="No resolve action taken.",
-            cumulative_score=_clamp_score(cumulative_score + error_score),
+            cumulative_score=_safe_score(cumulative_score + err),
         )
 
-    ticket_id = action.get("parameters", {}).get("ticket_id")
-    if not ticket_id:
-        error_score = _clamp_score(0.01)
+    tid = action.get("parameters", {}).get("ticket_id")
+    if not tid:
+        err = _safe_score(0.01)
         return Reward(
-            score=error_score,
-            partial_scores={"missing_ticket_id": error_score},
+            score=err,
+            partial_scores={"missing_ticket_id": err},
             feedback="Missing ticket_id.",
-            cumulative_score=_clamp_score(cumulative_score + error_score),
+            cumulative_score=_safe_score(cumulative_score + err),
         )
 
-    ticket_map = {t.ticket_id: t for t in initial_tickets}
-    ticket = ticket_map.get(ticket_id)
+    tickets = {t.ticket_id: t for t in initial_tickets}
+    ticket = tickets.get(tid)
 
     if ticket is None:
-        error_score = _clamp_score(0.01)
+        err = _safe_score(0.01)
         return Reward(
-            score=error_score,
-            partial_scores={"ticket_not_found": error_score},
-            feedback=f"Ticket {ticket_id} not found.",
-            cumulative_score=_clamp_score(cumulative_score + error_score),
+            score=err,
+            partial_scores={"ticket_not_found": err},
+            feedback=f"Ticket {tid} not found.",
+            cumulative_score=_safe_score(cumulative_score + err),
         )
 
-    raw_value = getattr(ticket, "value", 0.01)
-    step_reward = _clamp_score(raw_value)
+    raw = getattr(ticket, "value", 0.01)
+    score = _safe_score(raw)
 
     return Reward(
-        score=step_reward,
-        partial_scores={"resolved_value": step_reward},
-        feedback=f"Resolved {ticket_id}",
-        cumulative_score=_clamp_score(cumulative_score + step_reward),
+        score=score,
+        partial_scores={"resolved_value": score},
+        feedback=f"Resolved {tid}",
+        cumulative_score=_safe_score(cumulative_score + score),
     )
 
 
