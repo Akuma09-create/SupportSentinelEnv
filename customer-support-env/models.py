@@ -45,6 +45,29 @@ class Observation(BaseModel):
     max_steps: int
     available_actions: List[str]
     current_score: float
+    
+    @field_validator('current_score')
+    @classmethod
+    def validate_current_score_range(cls, v):
+        """Ensure current_score is strictly between 0 and 1 (exclusive on both ends)."""
+        if not (0 < v < 1):
+            v = max(0.01, min(0.99, v))
+        return v
+    
+    @field_validator('current_score', mode='after')
+    @classmethod
+    def finalize_current_score_precision(cls, v):
+        """Final safety: check for floating-point edge cases and round precisely."""
+        v = float(v)
+        # If within rounding distance of 0/1, push inward
+        if v <= 0.001:
+            return 0.01
+        if v >= 0.999:
+            return 0.99
+        # Round to 4 decimals to prevent serialization issues
+        rounded = round(v, 4)
+        # Extra safety after rounding
+        return max(0.01, min(0.99, rounded))
 
 
 class Reward(BaseModel):
