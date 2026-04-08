@@ -224,7 +224,7 @@ What action should we take next?"""
             
             self.current_observation = observation
             self.step_count += 1
-            reward_value = reward_data.get("score", 0.0)
+            reward_value = reward_data.get("score", 0.01)
             self.rewards.append(reward_value)
             
             return observation, reward_value, done, data.get("info", {})

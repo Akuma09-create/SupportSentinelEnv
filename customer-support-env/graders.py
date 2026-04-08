@@ -133,7 +133,7 @@ def grade_sentiment_recovery(
     is_resolved = final_ticket.status == "resolved"
     resolution_bonus = 0.2 if is_resolved else 0.01  # never 0.0
 
-    raw_score = (sentiment_score_component * sla_bonus) + (0.2 if is_resolved else 0.0)
+    raw_score = (sentiment_score_component * sla_bonus) + (0.2 if is_resolved else 0.01)
     final_score = _clamp_score(raw_score)
 
     if is_resolved:
