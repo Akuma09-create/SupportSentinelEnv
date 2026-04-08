@@ -194,8 +194,12 @@ class SupportSentinelEnv:
         # CRITICAL: Add defensive clamping to reward before use
         # This ensures score and cumulative_score are strictly in (0.01, 0.99)
         if reward:
+            orig_score = reward.score
+            orig_cum = reward.cumulative_score
             reward.score = max(0.01, min(0.99, reward.score))
             reward.cumulative_score = max(0.01, min(0.99, reward.cumulative_score))
+            assert 0.01 <= reward.score <= 0.99, f"ENV: score {orig_score} clamped to {reward.score}"
+            assert 0.01 <= reward.cumulative_score <= 0.99, f"ENV: cumulative {orig_cum} clamped to {reward.cumulative_score}"
         
         # For multi-step tasks, the final cumulative score is the final reward.
         # For single-step tasks, we add the score to the (zero) base.

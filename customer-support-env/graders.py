@@ -10,7 +10,7 @@ except (ImportError, ValueError):
     from models import Ticket, Reward
 
 
-# 🔒 FINAL SAFE SCORE FUNCTION
+# 🔒 FINAL SAFE SCORE FUNCTION WITH STRICT ASSERTIONS
 def _safe_score(value: float) -> float:
     try:
         value = float(value)
@@ -22,7 +22,9 @@ def _safe_score(value: float) -> float:
     if value >= 1:
         return 0.99
 
-    return round(value, 4)
+    result = round(value, 4)
+    assert 0.01 <= result <= 0.99, f"FATAL: _safe_score escaped bounds! Input={value}, Result={result}"
+    return result
 
 
 # ------------------- SLA TRIAGE -------------------
@@ -43,11 +45,14 @@ def grade_sla_triage(
             raise ValueError("Invalid ticket_ids format")
     except Exception as e:
         error_score = _safe_score(0.01)
+        assert 0.01 <= error_score <= 0.99, f"ERROR_SCORE out of bounds: {error_score}"
+        cum = _safe_score(cumulative_score + error_score)
+        assert 0.01 <= cum <= 0.99, f"CUMULATIVE out of bounds: {cum}"
         return Reward(
             score=error_score,
             partial_scores={"validation_error": error_score},
             feedback=f"Invalid action: {e}",
-            cumulative_score=_safe_score(cumulative_score + error_score),
+            cumulative_score=cum,
         )
 
     ticket_map = {t.ticket_id: t for t in initial_tickets}
@@ -77,12 +82,14 @@ def grade_sla_triage(
 
     raw_score = success / total if total > 0 else 0.01
     score = _safe_score(raw_score)
-
+    assert 0.01 <= score <= 0.99, f"SLA_SCORE out of bounds: {score}"
+    cum = _safe_score(cumulative_score + score)
+    assert 0.01 <= cum <= 0.99, f"CUMULATIVE out of bounds: {cum}"
     return Reward(
         score=score,
         partial_scores={"sla_compliance": score},
         feedback="\n".join(feedback_lines),
-        cumulative_score=_safe_score(cumulative_score + score),
+        cumulative_score=cum,
     )
 
 
@@ -131,6 +138,12 @@ def grade_sentiment_recovery(
     raw_score = (sentiment * sla_bonus) + resolution_bonus
     final_score = _safe_score(raw_score)
 
+    assert 0.01 <= sentiment <= 0.99, f"SENTIMENT out of bounds: {sentiment}"
+    assert 0.01 <= sla_bonus <= 0.99, f"SLA_BONUS out of bounds: {sla_bonus}"
+    assert 0.01 <= resolution_bonus <= 0.99, f"RESOLUTION_BONUS out of bounds: {resolution_bonus}"
+    assert 0.01 <= final_score <= 0.99, f"FINAL_SCORE out of bounds: {final_score}"
+    cum = _safe_score(cumulative_score + final_score)
+    assert 0.01 <= cum <= 0.99, f"CUMULATIVE out of bounds: {cum}"
     return Reward(
         score=final_score,
         partial_scores={
@@ -139,7 +152,7 @@ def grade_sentiment_recovery(
             "resolution_bonus": resolution_bonus,
         },
         feedback=f"Final sentiment: {final.sentiment_score:.2f}",
-        cumulative_score=_safe_score(cumulative_score + final_score),
+        cumulative_score=cum,
     )
 
 
@@ -190,11 +203,14 @@ def grade_queue_optimization(
     raw = getattr(ticket, "value", 0.01)
     score = _safe_score(raw)
 
+    assert 0.01 <= score <= 0.99, f"QUEUE_SCORE out of bounds: {score}"
+    cum = _safe_score(cumulative_score + score)
+    assert 0.01 <= cum <= 0.99, f"CUMULATIVE out of bounds: {cum}"
     return Reward(
         score=score,
         partial_scores={"resolved_value": score},
         feedback=f"Resolved {tid}",
-        cumulative_score=_safe_score(cumulative_score + score),
+        cumulative_score=cum,
     )
 
 
