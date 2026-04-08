@@ -87,6 +87,7 @@ def run_episode(task_id: str, seed: int):
     rewards = []
     step_count = 0
     success = False
+    episode_done = False
     
     try:
         @retry_on_failure(max_attempts=3, delay=1.0)
@@ -124,10 +125,13 @@ def run_episode(task_id: str, seed: int):
             log_step(step_count + 1, action_json, reward_score, done)
             step_count += 1
         
-        success = True
+        # Success only if episode completed (done=True)
+        episode_done = done
+        success = done and step_count > 0
     
     except Exception:
         success = False
+        episode_done = False
     
     finally:
         log_end(success=success, total_steps=step_count, rewards_list=rewards)
