@@ -13,7 +13,10 @@ import httpx
 # ============================================================================
 # ENVIRONMENT VARIABLES - As per hackathon requirements
 # ============================================================================
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+API_BASE_URL = os.environ.get("API_BASE_URL")
+if API_BASE_URL is None:
+    raise ValueError("API_BASE_URL environment variable is required (LiteLLM proxy endpoint)")
+
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
 API_KEY = os.environ["API_KEY"]  # Required - injected by hackathon framework
 
