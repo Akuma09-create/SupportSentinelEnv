@@ -22,8 +22,8 @@ def grade_sla_triage(action: Dict[str, Any], initial_tickets: List[Ticket], fina
             raise ValueError("Invalid 'ticket_ids' format.")
     except (KeyError, TypeError, ValueError) as e:
         return Reward(
-            score=0.0,
-            partial_scores={"validation_error": 0.0},
+            score=0.01,
+            partial_scores={"validation_error": 0.01},
             feedback=f"Invalid action format: {e}",
             cumulative_score=cumulative_score
         )
@@ -33,8 +33,8 @@ def grade_sla_triage(action: Dict[str, Any], initial_tickets: List[Ticket], fina
     # Check for duplicate or missing IDs
     if len(set(prioritized_ids)) != len(initial_tickets) or set(prioritized_ids) != set(ticket_map.keys()):
         return Reward(
-            score=0.0,
-            partial_scores={"validation_error": 0.0},
+            score=0.01,
+            partial_scores={"validation_error": 0.01},
             feedback="Error: ticket_ids must contain all unique ticket IDs exactly once.",
             cumulative_score=cumulative_score
         )
@@ -52,7 +52,9 @@ def grade_sla_triage(action: Dict[str, Any], initial_tickets: List[Ticket], fina
         else:
             feedback_lines.append(f"FAILURE: Ticket {ticket_id} (SLA: {ticket.sla_steps_remaining}) breached at step {steps_elapsed}.")
 
-    score = resolved_within_sla / total_tickets if total_tickets > 0 else 0.0
+    score = resolved_within_sla / total_tickets if total_tickets > 0 else 0.01
+    # Clamp score to valid range (0, 1) - strictly between 0 and 1
+    score = max(0.01, min(0.99, score))
     partial_scores["sla_compliance"] = score
     
     feedback = "SLA Triage Result:\n" + "\n".join(feedback_lines)
@@ -110,8 +112,8 @@ def grade_sentiment_recovery(action: Dict[str, Any], initial_tickets: List[Ticke
     
     final_score = score + resolution_bonus
     
-    # Ensure score is capped at 1.0
-    final_score = min(final_score, 1.0)
+    # Clamp score to valid range (0, 1) - strictly between 0 and 1
+    final_score = max(0.01, min(0.99, final_score))
 
     partial_scores = {
         "sentiment_component": sentiment_score_component,
@@ -136,29 +138,30 @@ def grade_queue_optimization(action: Dict[str, Any], initial_tickets: List[Ticke
     """
     # 1. Check if the action was to resolve a ticket
     if action.get("action_type") != "resolve":
-        return Reward(score=0.0, partial_scores={}, feedback="No resolve action taken.", cumulative_score=cumulative_score)
+        return Reward(score=0.01, partial_scores={}, feedback="No resolve action taken.", cumulative_score=cumulative_score)
 
     ticket_id_to_resolve = action.get("parameters", {}).get("ticket_id")
     if not ticket_id_to_resolve:
-        return Reward(score=0.0, partial_scores={}, feedback="Resolve action taken, but no ticket_id specified.", cumulative_score=cumulative_score)
+        return Reward(score=0.01, partial_scores={}, feedback="Resolve action taken, but no ticket_id specified.", cumulative_score=cumulative_score)
 
     # 2. Find the ticket in the state *before* the action to get its value
     initial_ticket = next((t for t in initial_tickets if t.ticket_id == ticket_id_to_resolve), None)
     if not initial_ticket:
-        return Reward(score=0.0, partial_scores={}, feedback=f"Agent tried to resolve ticket {ticket_id_to_resolve}, but it wasn't in the initial state for this step.", cumulative_score=cumulative_score)
+        return Reward(score=0.01, partial_scores={}, feedback=f"Agent tried to resolve ticket {ticket_id_to_resolve}, but it wasn't in the initial state for this step.", cumulative_score=cumulative_score)
 
     # 3. Find the ticket in the state *after* the action to confirm it was resolved
     final_ticket = next((t for t in final_tickets if t.ticket_id == ticket_id_to_resolve), None)
     if not final_ticket or not final_ticket.resolved:
         return Reward(
-            score=0.0,
+            score=0.01,
             partial_scores={},
             feedback=f"Action to resolve ticket {ticket_id_to_resolve} was taken, but it was not resolved in the final state.",
             cumulative_score=cumulative_score
         )
 
     # 4. If resolved, the reward for this step is the ticket's value.
-    step_reward = initial_ticket.value
+    # Clamp to valid range (0, 1)
+    step_reward = max(0.01, min(0.99, initial_ticket.value))
     
     return Reward(
         score=step_reward,
