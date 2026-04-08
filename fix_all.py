@@ -193,7 +193,7 @@ old_func = '''def grade_queue_optimization(action: Dict[str, Any], initial_ticke
     if not done:
         # Intermediate steps have no reward, but we must return a valid Reward object.
         return Reward(
-            score=0.0,
+            score=0.01,
             partial_scores={},
             feedback="Ticket resolved. Awaiting end of episode for final score.",
             cumulative_score=cumulative_score
@@ -204,7 +204,7 @@ old_func = '''def grade_queue_optimization(action: Dict[str, Any], initial_ticke
     
     if not resolved_tickets:
         return Reward(
-            score=0.0,
+            score=0.01,
             partial_scores={"total_value": 0},
             feedback="No tickets were resolved.",
             cumulative_score=cumulative_score
@@ -213,7 +213,7 @@ old_func = '''def grade_queue_optimization(action: Dict[str, Any], initial_ticke
     total_value = sum(t.value for t in resolved_tickets)
     
     # Normalize the score against the total possible value from the initial set of tickets
-    score = total_value / max_possible_value if max_possible_value > 0 else 0
+    score = total_value / max_possible_value if max_possible_value > 0 else 0.01
 
     return Reward(
         score=score,
@@ -229,7 +229,7 @@ new_func = '''def grade_queue_optimization(action: Dict[str, Any], initial_ticke
     """
     if not done:
         return Reward(
-            score=0.0,
+            score=0.01,
             partial_scores={},
             feedback="Ticket processed.",
             cumulative_score=cumulative_score
@@ -239,7 +239,7 @@ new_func = '''def grade_queue_optimization(action: Dict[str, Any], initial_ticke
     
     if not resolved_tickets:
         return Reward(
-            score=0.0,
+            score=0.01,
             partial_scores={"total_value": 0},
             feedback="No tickets resolved.",
             cumulative_score=cumulative_score

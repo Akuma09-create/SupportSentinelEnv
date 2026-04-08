@@ -236,7 +236,7 @@ What action should we take next?"""
         """Run a complete episode with structured logging."""
         log_start(self.task_id, "SupportSentinelEnv", MODEL_NAME)
         
-        final_score = 0.0
+        final_score = 0.01  # Start at minimum valid score
         success = False
         
         try:
@@ -256,8 +256,8 @@ What action should we take next?"""
                 # Log step (STEP format required)
                 log_step(self.step_count, action_str, reward, done)
             
-            # Episode complete - calculate final score
-            final_score = sum(self.rewards) if self.rewards else 0.0
+            # Episode complete — calculate final score with minimum valid default
+            final_score = sum(self.rewards) if self.rewards else 0.01
             success = final_score > 0.5  # Success threshold
             
             return {
