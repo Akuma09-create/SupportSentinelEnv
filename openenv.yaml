@@ -12,7 +12,7 @@ tags:
   - sentiment
 
 # Environment Specifications
-reward_range: [0.0, 1.0]
+reward_range: [0.01, 0.99]
 
 action_space:
   description: "The set of actions the agent can perform on tickets."
